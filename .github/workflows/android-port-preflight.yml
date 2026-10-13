@@ -141,6 +141,18 @@ jobs:
               s = s.replace(before, after, 1)
           p.write_text(s)
           print('Patched UTF string code-unit aliases to standard char16_t/char32_t types.')
+
+          # OGRE v1.11.6 ships a stale APKZipArchive translation unit whose
+          # factory declarations/implementation are absent from this tag.
+          # The Android port uses the standard APK filesystem archive instead;
+          # leave this optional ZIP adapter out so the core engine can compile.
+          apk_zip = Path('OgreMain/src/Android/OgreAPKZipArchive.cpp')
+          if apk_zip.exists():
+              apk_zip.write_text(
+                  '// Disabled for this Android build: upstream v1.11.6 contains '
+                  'an orphaned APKZipArchive implementation with no matching declarations.\\n'
+              )
+              print('Disabled orphaned optional APKZipArchive translation unit.')
           PY
       - name: Compile OGRE core and GLES2 renderer
         run: |
