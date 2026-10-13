@@ -220,7 +220,7 @@ static int32_t handleInput(android_app*, AInputEvent* event, Graphics* g) {
             controls.throttle = std::max(0.0f, (z + 1.0f) * 0.5f);
             controls.brake = std::max(0.0f, (rz + 1.0f) * 0.5f);
         }
-        controls = ror_android::normalizeControls(controls);
+        controls = ror_android::normalizeControls(controls.steering, controls.throttle, controls.brake);
         g->steer = controls.steering;
         g->throttle = controls.throttle;
         g->brake = controls.brake;
@@ -261,7 +261,7 @@ static int32_t handleInput(android_app*, AInputEvent* event, Graphics* g) {
         }
     }
     const ror_android::VehicleControls controls = ror_android::normalizeControls(
-        {g->steer, g->throttle, g->brake});
+        g->steer, g->throttle, g->brake);
     g->steer = controls.steering;
     g->throttle = controls.throttle;
     g->brake = controls.brake;
