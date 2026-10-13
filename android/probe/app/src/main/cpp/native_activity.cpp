@@ -196,7 +196,38 @@ static void render(Graphics& g) {
 }
 
 static int32_t handleInput(android_app*, AInputEvent* event, Graphics* g) {
-    if (!g || AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
+    if (!g) return 0;
+
+    // Physical controllers report normalized joystick axes through Android's
+    // motion-event API. Keep this mapping separate from the touch overlay so
+    // either input source can drive the same normalized control contract.
+    if (AInputEvent_getType(event) == AINPUT_EVENT_TYPE_MOTION &&
+        (AInputEvent_getSource(event) & AINPUT_SOURCE_JOYSTICK) == AINPUT_SOURCE_JOYSTICK) {
+        const float x = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_X, 0);
+        const float y = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Y, 0);
+        const float rightTrigger = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RTRIGGER, 0);
+        const float brakeTrigger = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_LTRIGGER, 0);
+        const float z = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_Z, 0);
+        const float rz = AMotionEvent_getAxisValue(event, AMOTION_EVENT_AXIS_RZ, 0);
+
+        ror_android::VehicleControls controls = ror_android::neutralControls();
+        controls.steering = std::abs(x) > 0.08f ? x : 0.0f;
+        // Prefer trigger axes when present; fall back to the right stick's Y
+        // axis for devices that expose no analog trigger range.
+        controls.throttle = std::max(rightTrigger, std::max(0.0f, -y));
+        controls.brake = std::max(brakeTrigger, std::max(0.0f, y));
+        if (rightTrigger == 0.0f && brakeTrigger == 0.0f && (z != 0.0f || rz != 0.0f)) {
+            controls.throttle = std::max(0.0f, (z + 1.0f) * 0.5f);
+            controls.brake = std::max(0.0f, (rz + 1.0f) * 0.5f);
+        }
+        controls = ror_android::normalizeControls(controls);
+        g->steer = controls.steering;
+        g->throttle = controls.throttle;
+        g->brake = controls.brake;
+        return 1;
+    }
+
+    if (AInputEvent_getType(event) != AINPUT_EVENT_TYPE_MOTION) return 0;
     const int action = AMotionEvent_getAction(event);
     const int masked = action & AMOTION_EVENT_ACTION_MASK;
     const int index = (action & AMOTION_EVENT_ACTION_POINTER_INDEX_MASK) >>
@@ -229,13 +260,19 @@ static int32_t handleInput(android_app*, AInputEvent* event, Graphics* g) {
             if (id == g->brakePointer) g->brake = std::clamp((py / h - 0.62f) / 0.38f, 0.0f, 1.0f);
         }
     }
+    const ror_android::VehicleControls controls = ror_android::normalizeControls(
+        {g->steer, g->throttle, g->brake});
+    g->steer = controls.steering;
+    g->throttle = controls.throttle;
+    g->brake = controls.brake;
     return 1;
 }
 
 static void resetControls(Graphics& g) {
-    g.steer = 0.0f;
-    g.throttle = 0.0f;
-    g.brake = 0.0f;
+    const ror_android::VehicleControls neutral = ror_android::neutralControls();
+    g.steer = neutral.steering;
+    g.throttle = neutral.throttle;
+    g.brake = neutral.brake;
     g.joystickPointer = -1;
     g.throttlePointer = -1;
     g.brakePointer = -1;
