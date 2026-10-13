@@ -1,28 +1,37 @@
 # Rigs of Rods Android Port
 
-Experimental Android port workspace for Rigs of Rods.
+Experimental Android port workspace for the upstream Rigs of Rods simulator.
 
-## Verified status (2026-10-13)
+## Current state
 
-- The ARM64 native diagnostic APK builds successfully in GitHub Actions.
-- The generated APK archive was downloaded and checked locally; it contains `lib/arm64-v8a/libror_port_probe.so`, an ELF64 AArch64 shared library exporting `android_main`.
-- The diagnostic app initializes a native Android activity and OpenGL ES 3 surface and receives multi-touch input events.
-- **This is not the Rigs of Rods game.** No OGRE renderer, upstream RoR application, vehicle assets, or RoR physics are integrated yet. The touch values are prototype input state only, not connected to actual vehicle controls. Device installation, real-device rendering, driving, FPS, thermal behavior, and stability have not yet been validated.
+The repository currently builds a **native diagnostic app, not a playable Rigs of Rods game**.
 
-## Download the diagnostic APK
+- NativeActivity + EGL + OpenGL ES probe and multi-touch control visualization.
+- A platform-neutral normalized analog-control contract and host-side tests.
+- Lifecycle handling clears touch controls on pause, focus loss, stop, and surface destruction to avoid stuck input.
+- GitHub Actions includes an experimental OGRE 1.11.6 Android ARM64/GLES2 build job. OGRE output alone is not the complete game.
+- The upstream RoR application, production renderer integration, real vehicle/terrain resources, OIS replacement, and connection to the vehicle physics are not yet integrated.
 
-Open the [latest GitHub Actions run](https://github.com/vluiz6102-blip/rigs-of-rods-android-/actions/workflows/android-port-preflight.yml). In a successful run, download the artifact named `ror-android-native-probe-arm64-not-the-game`.
+## Build and test status
 
-## Licensing
+See [GitHub Actions](https://github.com/vluiz6102-blip/rigs-of-rods-android-/actions). Artifacts are named to make clear that the diagnostic APK and OGRE libraries are **not the game**. Do not use them as evidence that driving works.
 
-Rigs of Rods is licensed under GPL-3.0-or-later. Preserve upstream copyright and license notices. Community vehicles and terrains may have separate licenses and must be reviewed individually.
+## Target device profile
 
-## Next milestones
+Initial target: Android ARM64 devices with **8 GB RAM or more**. This is a design target, not a verified minimum requirement. Actual memory use and compatibility must be measured after real terrains and vehicles load. GPU compatibility must be validated per driver/vendor; no universal GPU support claim is made.
 
-1. Validate installation and lifecycle on a physical ARM64 Android device.
-2. Port and validate OGRE and dependencies for Android.
-3. Adapt RoR application startup, resource loading, window and input systems.
-4. Connect touch controls to the real vehicle simulation and input bindings.
-5. Test driving, FPS, memory, heat, crashes and long-session stability on devices.
+## Licensing and content
 
-Upstream: https://github.com/RigsOfRods/rigs-of-rods
+Rigs of Rods is GPL-3.0-or-later. A distributed derivative must preserve notices and meet the license's corresponding-source obligations. Review each community vehicle, terrain, texture, sound, and other asset's redistribution terms separately before bundling it.
+
+## Required milestones before calling it playable
+
+1. Integrate the upstream RoR application startup and Android surface lifecycle.
+2. Build and package the engine plus all required runtime dependencies.
+3. Replace/adapt the OIS backend while preserving RoR input semantics, including touch and compatible physical controllers.
+4. Load a real terrain and a real vehicle through RoR's resource system.
+5. Prove steering, throttle, braking, and collisions act on the upstream vehicle simulation.
+6. Test pause/resume, surface recreation, sustained driving, crash logs, memory, GPU frame time, and thermal behavior on physical devices with 8 GB RAM.
+7. Publish a source-complete, license-compliant build and a reproducible test report.
+
+Upstream source: https://github.com/RigsOfRods/rigs-of-rods
