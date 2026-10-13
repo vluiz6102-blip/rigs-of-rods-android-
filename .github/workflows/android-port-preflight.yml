@@ -11,9 +11,9 @@ permissions:
 jobs:
   test-control-contract:
     name: Host-test normalized vehicle control contract
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Compile and run control contract tests
         run: |
           set -euxo pipefail
@@ -22,17 +22,17 @@ jobs:
 
   build-native-probe:
     name: Build ARM64 native Android probe (not the game)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
       - uses: gradle/actions/setup-gradle@v6
         with:
           gradle-version: '9.5.0'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
       - name: Install Android SDK / NDK components
@@ -52,19 +52,22 @@ jobs:
           test -s "$APK"
           unzip -t "$APK"
           unzip -p "$APK" lib/arm64-v8a/libror_port_probe.so > /tmp/libror_port_probe.so
+          unzip -p "$APK" lib/x86_64/libror_port_probe.so > /tmp/libror_port_probe_x86_64.so
           NDK_DIR="$(find "$ANDROID_HOME/ndk" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           test -n "$NDK_DIR"
           "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h /tmp/libror_port_probe.so > /tmp/ror-elf-header.txt
+          "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h /tmp/libror_port_probe_x86_64.so > /tmp/ror-elf-x86-header.txt
           "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -Ws /tmp/libror_port_probe.so > /tmp/ror-elf-symbols.txt
           grep -q 'AArch64' /tmp/ror-elf-header.txt
+          grep -qi 'x86-64' /tmp/ror-elf-x86-header.txt
           grep -q 'android_main' /tmp/ror-elf-symbols.txt
-          echo 'APK archive valid; native library is AArch64 and exports android_main.'
+          echo 'APK archive valid; ARM64 and x86_64 native libraries validated.'
       - name: Install and smoke-test on ARM64 Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           target: default
-          arch: arm64-v8a
+          arch: x86_64
           profile: pixel_2
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           script: |
@@ -83,20 +86,20 @@ jobs:
 
   build-ogre-android:
     name: Build OGRE 1.11.6 for Android ARM64 (engine dependency)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
         with:
           packages: platform-tools
       - name: Install NDK and CMake
         run: |
           sdkmanager --install "ndk;28.2.13676358" "cmake;3.31.6"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: OGRECave/ogre
           ref: v1.11.6
@@ -158,7 +161,20 @@ jobs:
         run: |
           set -euxo pipefail
           cmake --build ogre-build --target OgreMain RenderSystem_GLES2 --parallel 2
-          cmake --install ogre-build
+          # Do not run the global install script: it also installs optional
+          # plugins that this minimal Android build intentionally does not build.
+          # Stage only the core/renderer, public headers, and built dependencies.
+          mkdir -p ogre-install/include/OGRE/RenderSystems/GLES2 ogre-install/lib/OGRE ogre-install/lib/dependencies
+          cp -a ogre-source/OgreMain/include/. ogre-install/include/OGRE/
+          cp -a ogre-source/RenderSystems/GLES2/include/. ogre-install/include/OGRE/RenderSystems/GLES2/
+          cp ogre-build/lib/libOgreMainStatic.a ogre-build/lib/libOgreGLSupportStatic.a ogre-install/lib/
+          cp ogre-build/lib/libRenderSystem_GLES2Static.a ogre-install/lib/OGRE/
+          if [ -d ogre-build/Dependencies/lib ]; then
+            find ogre-build/Dependencies/lib -maxdepth 1 -type f -name '*.a' -exec cp -t ogre-install/lib/dependencies/ {} +
+          fi
+          test -s ogre-install/lib/libOgreMainStatic.a
+          test -s ogre-install/lib/OGRE/libRenderSystem_GLES2Static.a
+          test -s ogre-install/include/OGRE/Ogre.h
       - name: Archive OGRE ARM64 libraries and build report
         run: |
           mkdir -p artifacts
