@@ -1,0 +1,39 @@
+name: Rigs of Rods Android port preflight
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-native-probe:
+    name: Build ARM64 native Android probe (not the game)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.5.0'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK / NDK components
+        run: |
+          sdkmanager --install \
+            "platforms;android-36" \
+            "build-tools;36.0.0" \
+            "ndk;28.2.13676358" \
+            "cmake;3.31.6"
+      - name: Compile diagnostic APK
+        working-directory: android/probe
+        run: gradle --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ror-android-native-probe-arm64-not-the-game
+          path: android/probe/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
