@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include "vehicle_controls.h"
 
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, "RoRPortProbe", __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "RoRPortProbe", __VA_ARGS__)
@@ -231,13 +232,27 @@ static int32_t handleInput(android_app*, AInputEvent* event, Graphics* g) {
     return 1;
 }
 
+static void resetControls(Graphics& g) {
+    g.steer = 0.0f;
+    g.throttle = 0.0f;
+    g.brake = 0.0f;
+    g.joystickPointer = -1;
+    g.throttlePointer = -1;
+    g.brakePointer = -1;
+}
+
 static void handleCmd(android_app* app, int32_t cmd) {
     auto* g = static_cast<Graphics*>(app->userData);
     if (!g) return;
     if (cmd == APP_CMD_INIT_WINDOW && app->window) {
+        resetControls(*g);
+        if (g->display != EGL_NO_DISPLAY) shutdownEgl(*g);
         if (initEgl(app, *g)) { if (initHud(*g)) render(*g); else LOGE("Failed to initialize HUD"); }
     } else if (cmd == APP_CMD_TERM_WINDOW) {
+        resetControls(*g);
         shutdownEgl(*g);
+    } else if (cmd == APP_CMD_PAUSE || cmd == APP_CMD_LOST_FOCUS || cmd == APP_CMD_STOP) {
+        resetControls(*g);
     } else if (cmd == APP_CMD_WINDOW_RESIZED && g->display != EGL_NO_DISPLAY) {
         eglQuerySurface(g->display, g->surface, EGL_WIDTH, &g->width);
         eglQuerySurface(g->display, g->surface, EGL_HEIGHT, &g->height);
