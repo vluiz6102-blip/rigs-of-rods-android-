@@ -2,44 +2,44 @@
 
 Updated: 2026-10-13
 
-## Verified milestones
+## Implemented in this repository
 
-- A native Android ARM64 diagnostic APK is compiled in GitHub Actions.
-- The workflow validates the APK ZIP structure, checks that `libror_port_probe.so` is ELF AArch64, and checks the exported NativeActivity entry point.
-- The diagnostic app uses Android NativeActivity + EGL + OpenGL ES 3.0.
-- Touch input tracks independent pointer IDs for steering, throttle, and brake.
-- The HUD now draws visible touch pads and a placeholder chassis using GLES 3 shaders/VBOs.
-- The CI workflow now has a separate build job for OGRE v1.11.6 targeting Android ARM64 with the GLES2 renderer. Its result must be checked in Actions; adding the job is not proof that OGRE built successfully.
+- Native Android diagnostic activity using NativeActivity, EGL, and OpenGL ES.
+- Multi-touch pointer tracking for the prototype steering, throttle, and brake pads.
+- Platform-neutral analog value normalization in `vehicle_controls.h` and `vehicle_controls.cpp`.
+- Host-side unit tests for normal values, clamping, NaN/infinity handling, and neutral controls.
+- Touch controls reset on Android pause, stop, lost focus, and surface termination/recreation to reduce stuck-input risk.
+- CI job for experimental OGRE 1.11.6 Android ARM64/GLES2 compilation.
 
-## Important blockers to full Rigs of Rods integration
+## Explicitly not implemented yet
 
-This repository does not yet contain the upstream Rigs of Rods application source, its content/resource packs, or an Android-adapted application lifecycle. The native diagnostic target is not the full game.
+**This repository does not currently contain a playable Rigs of Rods Android port.** The native activity renders a diagnostic HUD and placeholder chassis. The normalized controls are not connected to `RoR::InputEngine`, an active vehicle, or the physics simulation. No real RoR terrain or vehicle is loaded.
 
-The upstream dependency meta-build currently pins OGRE 1.11.6. On its non-Windows defaults it disables OIS, while the RoR `InputEngine.h` includes OIS headers and the application initializes an OIS input manager. That means compiling OGRE alone is insufficient: RoR's input abstraction and window/render initialization must be ported as well.
+## Integration architecture
 
-The Android port needs a coordinated implementation of:
+The upstream application must be integrated as a whole rather than replaced by the diagnostic loop:
 
-1. A GLES-compatible OGRE render system and verification of RoR shaders/materials and custom render features.
-2. Android lifecycle integration for surface creation, pause/resume, and context loss.
-3. Replacement or Android port of the OIS-backed input layer, while retaining existing RoR input event semantics.
-4. A JNI/native touch bridge that injects analog steering, throttle, and brake into the active vehicle's actual input/physics path, including neutral/reset handling when a pointer is released or the app loses focus.
-5. Resource discovery and storage paths for terrains, vehicles, textures, scripts, audio, and configuration.
-6. An ARM64 package containing all required native libraries and legally distributable content.
-7. Emulator and physical-device validation: boot, terrain load, vehicle spawn, drive/steer/brake, frame pacing, memory, thermal stability, pause/resume, and long-session crash checks.
+1. Port/adapt the RoR startup path, Android lifecycle, render-window creation, pause/resume, EGL context loss, and shutdown.
+2. Integrate OGRE with the GLES renderer and validate RoR's material/shader/render features. A successful OGRE library build is necessary but not sufficient.
+3. Adapt the OIS-backed `InputEngine` at the platform boundary. Preserve existing keyboard/joystick event semantics expected by gameplay, GUI, scripts, replay, and editor code; add Android touch and compatible physical controller mappings.
+4. Route analog input through the existing RoR input/actor control path. Do not mutate physics nodes from the UI thread. Reset input on pointer release, focus loss, pause, and surface destruction.
+5. Integrate resource discovery and writable paths for configuration, terrains, vehicles, textures, scripts, and audio; validate the exact resource formats and dependencies.
+6. Package all required ARM64 libraries and legally redistributable resources, preserving GPL-3.0-or-later notices and source obligations. Audit community assets individually.
 
-## Optimization plan
+## Target hardware and optimization
 
-Do not optimize by guesswork. First collect a baseline from a repeatable scene and vehicle. Use Android Studio Profiler/Perfetto, `adb shell dumpsys gfxinfo`, `dumpsys meminfo`, and logcat. Track CPU/GPU frame time, physics update time, memory high-water mark, thermal throttling, and crash-free session duration.
+Initial target profile: ARM64 Android devices with **8 GB RAM or more**. This is not a verified minimum yet. Measure actual resident memory, peak allocations, and load behavior after real content is integrated. GPU support must be tested across Adreno, Mali, PowerVR, and other supported GLES implementations; do not claim universal compatibility without device tests.
 
-After the game is actually running, apply changes in this order:
+After real gameplay works, establish repeatable terrain/vehicle baselines. Use Android Studio Profiler/Perfetto, `adb shell dumpsys gfxinfo`, `dumpsys meminfo`, and logcat. Track CPU/GPU frame time, physics-step time, memory high-water mark, thermal throttling, and crash-free session duration. Then tune view distance, shadows, water/reflections, particles, vegetation, texture resolution, loading, and frame pacing. Keep the physics timestep independent of rendering FPS where supported.
 
-- Release ARM64 build, LTO/section garbage collection only after checking plugin/resource loading.
-- Cap frame rate based on device capability and keep physics timestep independent from render FPS.
-- Reduce shadow quality, sight range, water/reflection updates, particles, vegetation density, and texture resolution through game settings before invasive engine changes.
-- Use asynchronous loading and avoid blocking the main/render thread.
-- Profile physics separately from rendering; preserve solver stability and simulation determinism.
-- Re-run the same scene/vehicle regression tests after every optimization.
+## Required release gates
 
-## License and assets
+- APK installs and starts on a physical ARM64 device.
+- A real terrain loads through RoR's resource system.
+- A real RoR vehicle spawns and can be driven, steered, braked, and collided.
+- Pause/resume and surface recreation do not leave controls stuck or crash.
+- Sustained play sessions are measured on physical 8 GB RAM devices.
+- GPU/device compatibility matrix, performance results, and known limitations are published.
+- License notices and redistributable asset terms are verified.
 
-The upstream Rigs of Rods project is GPL-3.0-or-later. Preserve notices and provide corresponding source when distributing a derivative under the license. Do not bundle community vehicles or terrains until their individual redistribution terms are checked.
+Upstream: https://github.com/RigsOfRods/rigs-of-rods
