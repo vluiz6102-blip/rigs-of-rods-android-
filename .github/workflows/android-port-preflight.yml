@@ -124,9 +124,9 @@ jobs:
             -DOGRE_BUILD_COMPONENT_CSHARP=OFF \
             -DOGRE_BUILD_COMPONENT_JAVA=OFF \
             -DOGRE_BUILD_COMPONENT_PYTHON=OFF \
-            -DOGRE_BUILD_COMPONENT_OVERLAY=OFF \
-            -DOGRE_BUILD_COMPONENT_TERRAIN=OFF \
-            -DOGRE_BUILD_COMPONENT_PAGING=OFF \
+            -DOGRE_BUILD_COMPONENT_OVERLAY=ON \
+            -DOGRE_BUILD_COMPONENT_TERRAIN=ON \
+            -DOGRE_BUILD_COMPONENT_PAGING=ON \
             -DOGRE_BUILD_PLUGIN_PARTICLEFX=OFF
       - name: Patch OGRE UTF string aliases for modern Android libc++
         working-directory: ogre-source
@@ -160,20 +160,31 @@ jobs:
       - name: Compile OGRE core and GLES2 renderer
         run: |
           set -euxo pipefail
-          cmake --build ogre-build --target OgreMain RenderSystem_GLES2 --parallel 2
+          cmake --build ogre-build --target OgreMain RenderSystem_GLES2 OgreOverlay OgreRTShaderSystem OgreTerrain OgrePaging OgreMeshLodGenerator --parallel 2
           # Do not run the global install script: it also installs optional
           # plugins that this minimal Android build intentionally does not build.
           # Stage only the core/renderer, public headers, and built dependencies.
-          mkdir -p ogre-install/include/OGRE/RenderSystems/GLES2 ogre-install/lib/OGRE ogre-install/lib/dependencies
+          mkdir -p ogre-install/include/OGRE/RenderSystems/GLES2 ogre-install/include/OGRE/Overlay ogre-install/include/OGRE/RTShaderSystem ogre-install/include/OGRE/Terrain ogre-install/include/OGRE/Paging ogre-install/include/OGRE/MeshLodGenerator ogre-install/lib/OGRE ogre-install/lib/dependencies
           cp -a ogre-source/OgreMain/include/. ogre-install/include/OGRE/
           cp -a ogre-source/RenderSystems/GLES2/include/. ogre-install/include/OGRE/RenderSystems/GLES2/
+          cp -a ogre-source/Components/Overlay/include/. ogre-install/include/OGRE/Overlay/
+          cp -a ogre-source/Components/RTShaderSystem/include/. ogre-install/include/OGRE/RTShaderSystem/
+          cp -a ogre-source/Components/Terrain/include/. ogre-install/include/OGRE/Terrain/
+          cp -a ogre-source/Components/Paging/include/. ogre-install/include/OGRE/Paging/
+          cp -a ogre-source/Components/MeshLodGenerator/include/. ogre-install/include/OGRE/MeshLodGenerator/
           cp ogre-build/lib/libOgreMainStatic.a ogre-build/lib/libOgreGLSupportStatic.a ogre-install/lib/
           cp ogre-build/lib/libRenderSystem_GLES2Static.a ogre-install/lib/OGRE/
+          cp ogre-build/lib/libOgreOverlayStatic.a ogre-build/lib/libOgreRTShaderSystemStatic.a ogre-build/lib/libOgreTerrainStatic.a ogre-build/lib/libOgrePagingStatic.a ogre-build/lib/libOgreMeshLodGeneratorStatic.a ogre-install/lib/OGRE/
           if [ -d ogre-build/Dependencies/lib ]; then
             find ogre-build/Dependencies/lib -maxdepth 1 -type f -name '*.a' -exec cp -t ogre-install/lib/dependencies/ {} +
           fi
           test -s ogre-install/lib/libOgreMainStatic.a
           test -s ogre-install/lib/OGRE/libRenderSystem_GLES2Static.a
+          test -s ogre-install/lib/OGRE/libOgreOverlayStatic.a
+          test -s ogre-install/lib/OGRE/libOgreRTShaderSystemStatic.a
+          test -s ogre-install/lib/OGRE/libOgreTerrainStatic.a
+          test -s ogre-install/lib/OGRE/libOgrePagingStatic.a
+          test -s ogre-install/lib/OGRE/libOgreMeshLodGeneratorStatic.a
           test -s ogre-install/include/OGRE/Ogre.h
       - name: Archive OGRE ARM64 libraries and build report
         run: |
