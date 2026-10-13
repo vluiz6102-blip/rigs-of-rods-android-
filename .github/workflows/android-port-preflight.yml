@@ -9,6 +9,17 @@ permissions:
   contents: read
 
 jobs:
+  test-control-contract:
+    name: Host-test normalized vehicle control contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile and run control contract tests
+        run: |
+          set -euxo pipefail
+          c++ -std=c++17 -Wall -Wextra -Werror -I android/probe/app/src/main/cpp android/probe/app/src/main/cpp/vehicle_controls.cpp android/probe/app/src/test/cpp/vehicle_controls_test.cpp -o /tmp/vehicle_controls_test
+          /tmp/vehicle_controls_test
+
   build-native-probe:
     name: Build ARM64 native Android probe (not the game)
     runs-on: ubuntu-latest
