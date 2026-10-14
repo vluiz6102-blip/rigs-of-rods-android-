@@ -2,7 +2,7 @@
 #include <android/input.h>
 #include <android_native_app_glue.h>
 #include <EGL/egl.h>
-#include <GLES3/gl3.h>
+#include <GLES2/gl2.h>
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -37,7 +37,7 @@ static bool initEgl(android_app* app, Graphics& g) {
         return false;
     }
     const EGLint attrs[] = {
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES3_BIT,
+        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
         EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
         EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
         EGL_DEPTH_SIZE, 16, EGL_NONE
@@ -48,7 +48,7 @@ static bool initEgl(android_app* app, Graphics& g) {
         LOGE("No EGL config for OpenGL ES 3");
         return false;
     }
-    const EGLint ctxAttrs[] = {EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE};
+    const EGLint ctxAttrs[] = {EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE};
     g.context = eglCreateContext(g.display, config, EGL_NO_CONTEXT, ctxAttrs);
     g.surface = eglCreateWindowSurface(g.display, config, app->window, nullptr);
     if (g.context == EGL_NO_CONTEXT || g.surface == EGL_NO_SURFACE ||
@@ -59,7 +59,7 @@ static bool initEgl(android_app* app, Graphics& g) {
     eglQuerySurface(g.display, g.surface, EGL_WIDTH, &g.width);
     eglQuerySurface(g.display, g.surface, EGL_HEIGHT, &g.height);
     glViewport(0, 0, g.width, g.height);
-    LOGI("OpenGL ES diagnostic surface: %dx%d", g.width, g.height);
+    LOGI("OpenGL ES 2 diagnostic surface: %dx%d", g.width, g.height);
     return true;
 }
 
@@ -83,15 +83,12 @@ static GLuint compileShader(GLenum type, const char* source) {
 
 static bool initHud(Graphics& g) {
     const char* vertexSource =
-        "#version 300 es\n"
-        "layout(location=0) in vec2 aPosition;\n"
+        "attribute vec2 aPosition;\n"
         "void main(){ gl_Position=vec4(aPosition,0.0,1.0); }\n";
     const char* fragmentSource =
-        "#version 300 es\n"
         "precision mediump float;\n"
         "uniform vec4 uColor;\n"
-        "out vec4 outColor;\n"
-        "void main(){ outColor=uColor; }\n";
+        "void main(){ gl_FragColor=uColor; }\n";
     GLuint vs = compileShader(GL_VERTEX_SHADER, vertexSource);
     GLuint fs = compileShader(GL_FRAGMENT_SHADER, fragmentSource);
     if (!vs || !fs) {
@@ -102,6 +99,8 @@ static bool initHud(Graphics& g) {
     g.program = glCreateProgram();
     glAttachShader(g.program, vs);
     glAttachShader(g.program, fs);
+    // GLSL ES 1.00 has no layout qualifiers, so bind the vertex input explicitly.
+    glBindAttribLocation(g.program, 0, "aPosition");
     glLinkProgram(g.program);
     glDeleteShader(vs);
     glDeleteShader(fs);
@@ -116,7 +115,13 @@ static bool initHud(Graphics& g) {
         return false;
     }
     g.colorLocation = glGetUniformLocation(g.program, "uColor");
-    g.positionLocation = 0;
+    g.positionLocation = glGetAttribLocation(g.program, "aPosition");
+    if (g.colorLocation < 0 || g.positionLocation < 0) {
+        LOGE("HUD shader attributes/uniforms not found");
+        glDeleteProgram(g.program);
+        g.program = 0;
+        return false;
+    }
     glGenBuffers(1, &g.vbo);
     return g.vbo != 0;
 }
