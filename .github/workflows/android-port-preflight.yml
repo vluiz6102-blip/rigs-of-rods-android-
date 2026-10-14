@@ -212,7 +212,7 @@ jobs:
             echo "This artifact contains OGRE libraries only; it is not a Rigs of Rods APK."
             find ogre-install -type f | sort
           } > artifacts/OGRE_ANDROID_BUILD_REPORT.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: ogre-1.11.6-android-arm64-libraries-not-game
           path: artifacts/
