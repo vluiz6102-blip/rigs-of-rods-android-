@@ -17,4 +17,4 @@ target_include_directories(android_native_app_glue PUBLIC "${NDK_ROOT}/sources/a
 add_library(ror_port_probe SHARED native_activity.cpp vehicle_controls.cpp)
 target_compile_features(ror_port_probe PRIVATE cxx_std_17)
 target_compile_options(ror_port_probe PRIVATE -Wall -Wextra -Wno-unused-parameter)
-target_link_libraries(ror_port_probe PRIVATE android_native_app_glue android log EGL GLESv3)
+target_link_libraries(ror_port_probe PRIVATE android_native_app_glue android log EGL GLESv2)
