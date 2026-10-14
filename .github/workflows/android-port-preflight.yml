@@ -62,6 +62,12 @@ jobs:
           grep -qi 'x86-64' /tmp/ror-elf-x86-header.txt
           grep -q 'android_main' /tmp/ror-elf-symbols.txt
           echo 'APK archive valid; ARM64 and x86_64 native libraries validated.'
+      # Preserve the diagnostic APK even if the emulator smoke test fails.
+      - uses: actions/upload-artifact@v6
+        with:
+          name: ror-android-native-probe-arm64-not-the-game
+          path: android/probe/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
       - name: Install and smoke-test on Android x86_64 emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -72,18 +78,26 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -gpu swiftshader_indirect -no-metrics
           script: |
+            set -euxo pipefail
             adb install android/probe/app/build/outputs/apk/debug/app-debug.apk
+            adb logcat -c
             adb shell monkey -p org.rigsofrods.portprobe 1
-            sleep 12
-            adb logcat -d -s RoRPortProbe:I AndroidRuntime:E > /tmp/ror-probe-log.txt
-            grep -q 'Started native Android OpenGL ES diagnostic' /tmp/ror-probe-log.txt
-            grep -q 'OpenGL ES diagnostic surface' /tmp/ror-probe-log.txt
-            if grep -q 'FATAL EXCEPTION' /tmp/ror-probe-log.txt; then cat /tmp/ror-probe-log.txt; exit 1; fi
-      - uses: actions/upload-artifact@v6
-        with:
-          name: ror-android-native-probe-arm64-not-the-game
-          path: android/probe/app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
+            sleep 8
+            adb logcat -d -v brief > /tmp/ror-probe-log.txt
+            if ! grep -q 'Started native Android OpenGL ES diagnostic' /tmp/ror-probe-log.txt; then
+              echo 'NativeActivity startup marker was not found. Recent logcat:'
+              tail -n 400 /tmp/ror-probe-log.txt
+              exit 1
+            fi
+            if ! grep -q 'OpenGL ES 2 diagnostic surface' /tmp/ror-probe-log.txt; then
+              echo 'OpenGL ES 2 surface was not created. EGL/renderer diagnostics:'
+              grep -E 'RoRPortProbe|EGL|egl|OpenGL|AndroidRuntime|FATAL' /tmp/ror-probe-log.txt | tail -n 250 || true
+              exit 1
+            fi
+            if grep -q 'FATAL EXCEPTION' /tmp/ror-probe-log.txt; then
+              tail -n 400 /tmp/ror-probe-log.txt
+              exit 1
+            fi
 
   build-ogre-android:
     name: Build OGRE 1.11.6 for Android ARM64 (engine dependency)
